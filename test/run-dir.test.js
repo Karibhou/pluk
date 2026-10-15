@@ -239,7 +239,7 @@ test('rotateLogFileIfNeeded trims an oversized log to the last N lines', () => {
     const lines = Array.from({ length: 100 }, (_, i) => `{"ts":"${i}"}`);
     writeFileSync(file, lines.join('\n') + '\n');
 
-    const rotated = rotateLogFileIfNeeded(file, { maxBytes: 10, keepLines: 10 });
+    const rotated = rotateLogFileIfNeeded(file, { maxBytes: 200, keepLines: 10 });
     assert.strictEqual(rotated, true);
 
     const kept = readFileSync(file, 'utf-8').split('\n').filter(l => l.trim());
@@ -293,7 +293,7 @@ test('rotateLogFileIfNeeded keeps lines appended between the snapshot and the re
 
     const late = Array.from({ length: 3 }, (_, i) => `{"ts":"late-${i}"}`);
     const rotated = rotateLogFileIfNeeded(file, {
-      maxBytes: 10,
+      maxBytes: 200,
       keepLines: 5,
       onSnapshot: () => appendFileSync(file, late.map(l => l + '\n').join('')),
     });
@@ -313,7 +313,7 @@ test('rotateLogFileIfNeeded completes a line that was mid-append at snapshot tim
     writeFileSync(file, lines.join('\n') + '\n' + last.slice(0, 6));
 
     const rotated = rotateLogFileIfNeeded(file, {
-      maxBytes: 10,
+      maxBytes: 200,
       keepLines: 5,
       onSnapshot: () => appendFileSync(file, last.slice(6) + '\n'),
     });
@@ -331,7 +331,7 @@ test('rotateLogFileIfNeeded keeps appends intact afterward (O_APPEND safety)', (
     const lines = Array.from({ length: 50 }, (_, i) => `{"ts":"${i}"}`);
     writeFileSync(file, lines.join('\n') + '\n');
 
-    assert.strictEqual(rotateLogFileIfNeeded(file, { maxBytes: 10, keepLines: 5 }), true);
+    assert.strictEqual(rotateLogFileIfNeeded(file, { maxBytes: 200, keepLines: 5 }), true);
 
     const fd = openSync(file, 'a');
     writeSync(fd, '{"ts":"new"}\n');
@@ -339,6 +339,27 @@ test('rotateLogFileIfNeeded keeps appends intact afterward (O_APPEND safety)', (
 
     const kept = readFileSync(file, 'utf-8').split('\n').filter(l => l.trim());
     assert.deepEqual(kept, [...lines.slice(-5), '{"ts":"new"}']);
+  } finally {
+    rmSync(base, { recursive: true, force: true });
+  }
+});
+
+test('rotateLogFileIfNeeded drops oldest kept lines until the log fits under maxBytes', () => {
+  const base = mkdtempSync(join(tmpdir(), 'pluk-rotate-bytes-'));
+  try {
+    const file = join(base, 'long.jsonl');
+    const lines = Array.from({ length: 10 }, (_, i) => `{"n":${i},"pad":"${'x'.repeat(100)}"}`);
+    writeFileSync(file, lines.join('\n') + '\n');
+    const maxBytes = 450;
+
+    assert.strictEqual(rotateLogFileIfNeeded(file, { maxBytes, keepLines: 8 }), true);
+
+    const content = readFileSync(file, 'utf-8');
+    assert.ok(Buffer.byteLength(content) <= maxBytes);
+    const after = content.split('\n').slice(0, -1);
+    assert.ok(after.length >= 1 && after.length < 8);
+    assert.deepEqual(after, lines.slice(-after.length));
+    assert.strictEqual(rotateLogFileIfNeeded(file, { maxBytes, keepLines: 8 }), false);
   } finally {
     rmSync(base, { recursive: true, force: true });
   }
