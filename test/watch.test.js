@@ -135,6 +135,68 @@ test('capture mode returns a stop handle and never throws without tmux', async (
   assert.deepEqual(events, []);
 });
 
+test('capture mode emits raw_output per changed frame when includeRaw is set', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pluk-capture-'));
+  const oldPath = process.env.PATH;
+  let handle;
+  try {
+    const frameFile = join(dir, 'frame.txt');
+    writeFileSync(frameFile, '\x1b[32mhello screen\x1b[0m\n');
+    const tmux = join(dir, 'tmux');
+    writeFileSync(tmux, `#!/bin/sh\ncat "${frameFile}"\n`, { mode: 0o755 });
+    process.env.PATH = `${dir}:${oldPath}`;
+
+    const events = [];
+    handle = watch({
+      session: 'wcapture',
+      cli: 'claude',
+      mode: 'capture',
+      captureIntervalMs: 30,
+      includeRaw: true,
+      onEvent: e => events.push(e),
+    });
+    await settle(250);
+    const raw = () => events.filter(e => e.type === 'raw_output');
+    // An unchanged frame is emitted once, not once per interval.
+    assert.equal(raw().length, 1);
+    assert.equal(raw()[0].data.line, 'hello screen\n');
+
+    writeFileSync(frameFile, 'a different screen\n');
+    await settle(250);
+    assert.equal(raw().length, 2);
+    assert.equal(raw()[1].data.line, 'a different screen\n');
+  } finally {
+    handle?.stop();
+    process.env.PATH = oldPath;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('capture mode emits no raw_output without includeRaw', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'pluk-capture-'));
+  const oldPath = process.env.PATH;
+  let handle;
+  try {
+    const tmux = join(dir, 'tmux');
+    writeFileSync(tmux, '#!/bin/sh\necho plain chatter\n', { mode: 0o755 });
+    process.env.PATH = `${dir}:${oldPath}`;
+    const events = [];
+    handle = watch({
+      session: 'wcapture2',
+      cli: 'claude',
+      mode: 'capture',
+      captureIntervalMs: 30,
+      onEvent: e => events.push(e),
+    });
+    await settle(120);
+    assert.equal(events.filter(e => e.type === 'raw_output').length, 0);
+  } finally {
+    handle?.stop();
+    process.env.PATH = oldPath;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('an onEvent callback that throws does not kill the line loop', async () => {
   const input = new PassThrough();
   const seen = [];
