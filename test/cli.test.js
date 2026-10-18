@@ -23,11 +23,13 @@ const pkg = JSON.parse(readFileSync(join(process.cwd(), 'package.json'), 'utf-8'
 let scratch; // per-run temp root
 let stubBin; // dir holding fake tmux/which/pgrep
 let tmuxLog; // file where the fake tmux records its argv
+let rgLog; // file where the fake rationguard records its argv
 
 before(() => {
   scratch = mkdtempSync(join(tmpdir(), 'pluk-cli-'));
   stubBin = join(scratch, 'bin');
   tmuxLog = join(scratch, 'tmux-args.log');
+  rgLog = join(scratch, 'rationguard-args.log');
   mkdirSync(stubBin, { recursive: true });
 
   // Fake tmux: records argv lines; `has-session` fails so attach takes the
@@ -40,20 +42,22 @@ printf '%s\\n' "$*" >> '${tmuxLog}'
 exit 0
 `,
   );
-  // Fake which: resolves only tmux and pluk to our stubs, fails otherwise
-  // (so resolveRationguardBin falls back without probing npx).
+  // Fake which: resolves only tmux, pluk and rationguard to our stubs, fails
+  // otherwise (so resolveRationguardBin never probes npx).
   writeFileSync(
     join(stubBin, 'which'),
     `#!/bin/sh
 case "$1" in
-  tmux|pluk) echo '${stubBin}'/"$1"; exit 0 ;;
+  tmux|pluk|rationguard) echo '${stubBin}'/"$1"; exit 0 ;;
   *) exit 1 ;;
 esac
 `,
   );
   writeFileSync(join(stubBin, 'pluk'), '#!/bin/sh\nexit 0\n');
   writeFileSync(join(stubBin, 'pgrep'), '#!/bin/sh\nexit 1\n');
-  for (const f of ['tmux', 'which', 'pluk', 'pgrep']) {
+  // Fake rationguard: records argv and exits so attach's foreground watcher returns.
+  writeFileSync(join(stubBin, 'rationguard'), `#!/bin/sh\nprintf '%s\\n' "$*" >> '${rgLog}'\nexit 0\n`);
+  for (const f of ['tmux', 'which', 'pluk', 'pgrep', 'rationguard']) {
     chmodSync(join(stubBin, f), 0o755);
   }
 });
@@ -303,13 +307,16 @@ test('attach --rationguard-bin without --rationguard prints a warning on stderr'
 
 test('attach --rationguard --rebuttal=log forwards the flag without warning', () => {
   rmSync(tmuxLog, { force: true });
+  rmSync(rgLog, { force: true });
   const runDir = makeRunDir();
   const { code, stderr } = runCli([
     'attach', 'agent-r-ok', `--run-dir=${runDir}`, '--no-open', '--rationguard', '--rebuttal=log',
   ]);
-  assert.equal(code, 0);
+  assert.equal(code, 0, stderr);
   assert.doesNotMatch(stderr, /ignored/);
   assert.match(stderr, /Creating tmux session/);
+  const rgCalls = readFileSync(rgLog, 'utf-8');
+  assert.match(rgCalls, /^watch agent-r-ok .*--rebuttal=log/m);
 });
 
 // --- watch over stdin -------------------------------------------------------------
