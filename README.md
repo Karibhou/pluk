@@ -111,7 +111,7 @@ tmux attach -t my-agent
 | `--command=<cmd>` | Override the CLI command/executable to launch (instead of the default resolved from `--cli`); combines with `--cli-args` |
 | `--rationguard` | Start rationguard watcher alongside pluk (requires `rationguard` on `PATH` — `npm install -g @hivecommons/rationguard` — or `--rationguard-bin`; pluk never fetches it from the registry implicitly) |
 | `--rationguard-bin=<cmd>` | Explicit rationguard command to run instead of the one on `PATH`, e.g. `--rationguard-bin='npx --yes @hivecommons/rationguard@0.11.0'` (also `PLUK_RATIONGUARD_BIN`); requires `--rationguard` |
-| `--rebuttal=send` | Auto-send rebuttals when rationguard detects excuses; requires `--rationguard` |
+| `--rebuttal=log\|send` | How rationguard handles detected excuses: `log` (rationguard's default) only records the rebuttal in its session log; `send` also types it back into the agent session. Any other value exits 2; requires `--rationguard` (ignored with a warning otherwise) |
 | `--dangerous` | Skip CLI permission prompts (`--dangerously-skip-permissions` for claude, `--full-auto` for codex, `--non-interactive` for goose, `--approval-mode yolo` for omp) |
 | `--dir=/path` | Working directory for the agent |
 | `--cli-args="..."` | Extra arguments to pass to the CLI |
