@@ -266,6 +266,52 @@ test('attach --dangerous word-splits a multi-token danger flag (omp)', () => {
   assert.match(calls, /^send-keys -t =agent-omp: -- 'omp' '--approval-mode' 'yolo' Enter$/m);
 });
 
+test('attach rejects invalid --rebuttal value with exit code 2 before touching tmux', () => {
+  rmSync(tmuxLog, { force: true });
+  const runDir = makeRunDir();
+  const { code, stderr } = runCli([
+    'attach', 'agent-r-invalid', `--run-dir=${runDir}`, '--rationguard', '--rebuttal=auto',
+  ]);
+  assert.equal(code, 2);
+  assert.match(stderr, /--rebuttal must be one of: log, send/);
+  assert.throws(() => readFileSync(tmuxLog), /ENOENT/, 'tmux must not be invoked');
+});
+
+test('attach --rebuttal without --rationguard prints a warning on stderr', () => {
+  rmSync(tmuxLog, { force: true });
+  const runDir = makeRunDir();
+  const { code, stderr } = runCli([
+    'attach', 'agent-r-warn', `--run-dir=${runDir}`, '--no-open', '--rebuttal=send',
+  ]);
+  assert.equal(code, 0);
+  assert.match(stderr, /Warning: --rebuttal is ignored without --rationguard/);
+  const calls = readFileSync(tmuxLog, 'utf-8');
+  assert.ok(calls.includes('new-session'), 'session must still be created');
+});
+
+test('attach --rationguard-bin without --rationguard prints a warning on stderr', () => {
+  rmSync(tmuxLog, { force: true });
+  const runDir = makeRunDir();
+  const { code, stderr } = runCli([
+    'attach', 'agent-rb-warn', `--run-dir=${runDir}`, '--no-open', '--rationguard-bin=/bin/false',
+  ]);
+  assert.equal(code, 0);
+  assert.match(stderr, /Warning: --rationguard-bin is ignored without --rationguard/);
+  const calls = readFileSync(tmuxLog, 'utf-8');
+  assert.ok(calls.includes('new-session'), 'session must still be created');
+});
+
+test('attach --rationguard --rebuttal=log forwards the flag without warning', () => {
+  rmSync(tmuxLog, { force: true });
+  const runDir = makeRunDir();
+  const { code, stderr } = runCli([
+    'attach', 'agent-r-ok', `--run-dir=${runDir}`, '--no-open', '--rationguard', '--rebuttal=log',
+  ]);
+  assert.equal(code, 0);
+  assert.doesNotMatch(stderr, /ignored/);
+  assert.match(stderr, /Creating tmux session/);
+});
+
 // --- watch over stdin -------------------------------------------------------------
 
 test('watch classifies stdin lines and emits JSONL events', () => {

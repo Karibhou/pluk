@@ -1,0 +1,1 @@
+- `--rebuttal` now validates its value is either `log` or `send`, exiting with code 2 if not, before any tmux side effect; `--rebuttal` or `--rationguard-bin` set without `--rationguard` now print a stderr warning that the flag is ignored (#280).

@@ -242,6 +242,22 @@ function cmdAttach(args: string[]): void {
     process.exit(1);
   }
 
+  // Validate --rebuttal value (must be 'log' or 'send')
+  if (flags['rebuttal'] !== undefined && flags['rebuttal'] !== 'log' && flags['rebuttal'] !== 'send') {
+    console.error(`${paintStderr(ANSI_RED, 'Error:')} --rebuttal must be one of: log, send`);
+    process.exit(2);
+  }
+
+  // Warn if --rebuttal or --rationguard-bin are set without --rationguard
+  if (flags['rationguard'] !== 'true') {
+    if (flags['rebuttal'] !== undefined) {
+      console.error(`${paintStderr(ANSI_RED, 'Warning:')} --rebuttal is ignored without --rationguard`);
+    }
+    if (flags['rationguard-bin'] !== undefined) {
+      console.error(`${paintStderr(ANSI_RED, 'Warning:')} --rationguard-bin is ignored without --rationguard`);
+    }
+  }
+
   attach({
     session,
     cli: flags['cli'] ?? 'claude',
