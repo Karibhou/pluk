@@ -93,6 +93,9 @@ function installPipePaneErrorHandlers(): void {
   process.on('unhandledRejection', () => {});
 }
 
+const REBUTTAL_MODES = ['log', 'send'] as const;
+type RebuttalMode = typeof REBUTTAL_MODES[number];
+
 function parseFilter(raw: string | undefined): PlukEventType[] | undefined {
   if (raw === undefined) return undefined;
   if (raw === '') {
@@ -242,19 +245,19 @@ function cmdAttach(args: string[]): void {
     process.exit(1);
   }
 
-  // Validate --rebuttal value (must be 'log' or 'send')
-  if (flags['rebuttal'] !== undefined && flags['rebuttal'] !== 'log' && flags['rebuttal'] !== 'send') {
-    console.error(`${paintStderr(ANSI_RED, 'Error:')} --rebuttal must be one of: log, send`);
+  const rebuttal = flags['rebuttal'];
+  if (rebuttal !== undefined && !(REBUTTAL_MODES as readonly string[]).includes(rebuttal)) {
+    console.error(`${paintStderr(ANSI_RED, 'Error:')} --rebuttal must be one of: ${REBUTTAL_MODES.join(', ')}`);
     process.exit(2);
   }
 
   // Warn if --rebuttal or --rationguard-bin are set without --rationguard
   if (flags['rationguard'] !== 'true') {
-    if (flags['rebuttal'] !== undefined) {
-      console.error(`${paintStderr(ANSI_RED, 'Warning:')} --rebuttal is ignored without --rationguard`);
+    if (rebuttal !== undefined) {
+      console.error('Warning: --rebuttal is ignored without --rationguard');
     }
     if (flags['rationguard-bin'] !== undefined) {
-      console.error(`${paintStderr(ANSI_RED, 'Warning:')} --rationguard-bin is ignored without --rationguard`);
+      console.error('Warning: --rationguard-bin is ignored without --rationguard');
     }
   }
 
@@ -265,7 +268,7 @@ function cmdAttach(args: string[]): void {
     cliArgs: flags['cli-args'],
     runDir: flags['run-dir'],
     rationguard: flags['rationguard'] === 'true',
-    rebuttal: flags['rebuttal'] as 'log' | 'send' | undefined,
+    rebuttal: rebuttal as RebuttalMode | undefined,
     noRaw: flags['no-raw'] === 'true',
     workDir: flags['dir'],
     noOpen: flags['no-open'] === 'true',

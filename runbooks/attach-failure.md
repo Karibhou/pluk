@@ -18,6 +18,8 @@ with no excuse detection and no rebuttals.
    - `Unsafe session name "<name>"`: use only letters, numbers, `_` and `-`.
    - `CLI command cannot be empty` / `Unterminated quote in command arguments`:
      fix the `--command` / `--cli-args` value.
+   - `--rebuttal must be one of: log, send`: fix the `--rebuttal` value; it is
+     checked before any tmux call, so nothing was created.
 3. Is the session being captured? A `Warning: pluk binary not found, skipping
    pipe-pane attachment` line means the session runs but nothing is logged.
    ```sh
@@ -42,6 +44,7 @@ with no excuse detection and no rebuttals.
 | `rationguard not found on PATH` | rationguard is not installed | `npm install -g @hivecommons/rationguard`, or pass `--rationguard-bin=COMMAND` / set `PLUK_RATIONGUARD_BIN` |
 | `--rationguard-bin / PLUK_RATIONGUARD_BIN command not found or not executable` | Override points at a missing command | Fix the path; the first word of the override must resolve |
 | `Failed to start rationguard (<cmd>)` | Binary exists but cannot be spawned | Run `<cmd> --version` directly; fix permissions or `PATH` |
+| `Warning: --rebuttal is ignored without --rationguard` / `Warning: --rationguard-bin is ignored without --rationguard` | rationguard flags given without `--rationguard`, so no watcher is started | Re-run with `--rationguard` |
 | `pluk binary not found, skipping pipe-pane attachment` | `pluk` is not on `PATH` for the attaching process | `npm install -g @hivecommons/pluk`, then re-run `pluk attach <session>` |
 | Session exists but the CLI was not started with the expected flags | Attached to an existing session; `--dangerous` only applies to new sessions | Restart the CLI using the command in the printed warning |
 | No events although the pipe-pane is active | Wrong `--cli` classifier for the agent | Re-attach with the right `--cli`; see [session-monitoring-failure.md](session-monitoring-failure.md) |
