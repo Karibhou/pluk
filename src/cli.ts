@@ -242,6 +242,20 @@ function cmdAttach(args: string[]): void {
     process.exit(1);
   }
 
+  const rebuttal = flags['rebuttal'];
+  if (rebuttal !== undefined && rebuttal !== 'log' && rebuttal !== 'send') {
+    console.error(`${paintStderr(ANSI_RED, 'Error:')} --rebuttal must be one of: log, send`);
+    process.exit(2);
+  }
+
+  if (flags['rationguard'] !== 'true') {
+    for (const flag of ['rebuttal', 'rationguard-bin']) {
+      if (flags[flag] !== undefined) {
+        console.error(`Warning: --${flag} is ignored without --rationguard`);
+      }
+    }
+  }
+
   attach({
     session,
     cli: flags['cli'] ?? 'claude',
@@ -249,7 +263,7 @@ function cmdAttach(args: string[]): void {
     cliArgs: flags['cli-args'],
     runDir: flags['run-dir'],
     rationguard: flags['rationguard'] === 'true',
-    rebuttal: flags['rebuttal'] as 'log' | 'send' | undefined,
+    rebuttal,
     noRaw: flags['no-raw'] === 'true',
     workDir: flags['dir'],
     noOpen: flags['no-open'] === 'true',

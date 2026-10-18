@@ -114,6 +114,59 @@ function makeRunDir() {
   return mkdtempSync(join(scratch, 'run-'));
 }
 
+// --- rationguard flag validation ---------------------------------------------------
+
+for (const rebuttal of ['auto', '', 'SEND', 'true']) {
+  for (const rationguard of [false, true]) {
+    test(`attach rejects --rebuttal=${rebuttal} with rationguard=${rationguard} before touching tmux`, () => {
+      const stubs = makeStubs({ which: ['tmux', 'pluk', 'rationguard'] });
+      const { code, stderr } = runAttach([
+        'invalid-rebuttal', `--run-dir=${makeRunDir()}`, '--no-open',
+        ...(rationguard ? ['--rationguard'] : []), `--rebuttal=${rebuttal}`,
+      ], stubs);
+      assert.equal(code, 2);
+      assert.match(stderr, /--rebuttal must be one of: log, send/);
+      assert.equal(stubs.log('tmux'), '', 'validation must precede all tmux calls');
+      assert.equal(stubs.log('rationguard'), '', 'invalid values must not reach rationguard');
+    });
+  }
+}
+
+for (const flags of [
+  ['--rebuttal=log'],
+  ['--rebuttal=send'],
+  ['--rationguard-bin=missing-command'],
+  ['--rebuttal=send', '--rationguard-bin='],
+]) {
+  test(`attach warns and continues without a watcher for orphaned ${flags.join(' ')}`, () => {
+    const stubs = makeStubs({ which: ['tmux', 'pluk', 'rationguard'] });
+    const { code, stderr } = runAttach([
+      'orphaned-flags', `--run-dir=${makeRunDir()}`, '--no-open', ...flags,
+    ], stubs);
+    assert.equal(code, 0);
+    assert.deepEqual(
+      stderr.split('\n').filter(line => line.startsWith('Warning:')),
+      flags.map(flag => `Warning: ${flag.split('=')[0]} is ignored without --rationguard`),
+    );
+    assert.match(stubs.log('tmux'), /^new-session /m);
+    assert.match(stubs.log('tmux'), /^pipe-pane /m);
+    assert.equal(stubs.log('rationguard'), '', 'orphaned flags must not start a watcher');
+  });
+}
+
+for (const rebuttal of ['log', 'send']) {
+  test(`attach forwards --rebuttal=${rebuttal} with --rationguard without warnings`, () => {
+    const stubs = makeStubs({ which: ['tmux', 'pluk', 'rationguard'] });
+    const { code, stderr } = runAttach([
+      'valid-rebuttal', `--run-dir=${makeRunDir()}`, '--no-open',
+      '--rationguard', '--rationguard-bin=rationguard', `--rebuttal=${rebuttal}`,
+    ], stubs);
+    assert.equal(code, 0);
+    assert.doesNotMatch(stderr, /Warning:/);
+    assert.match(stubs.log('rationguard'), new RegExp(`^watch valid-rebuttal .*--rebuttal=${rebuttal}(?: |$)`, 'm'));
+  });
+}
+
 // --- existing-session path ---------------------------------------------------------
 
 test('attach to an existing session skips create/send-keys and warns about --dangerous', () => {
