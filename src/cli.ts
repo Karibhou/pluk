@@ -25,13 +25,13 @@ ${ANSI_CYAN}Usage:${ANSI_RESET}
   pluk subscribe <session> [--filter=type1,type2] [--from-beginning] [--verbose] [--diagnostics[=secs]]
   pluk watch <session> [--cli=claude] [--filter=type1,type2] [--include-raw] [--capture[=ms]] [--diagnostics[=secs]]
   pluk send <session> --text="<text>" [--enter] [--literal]
-  pluk patterns [--cli=claude]
+  pluk patterns [--cli=claude] [--patterns-dir=<dir>]
   pluk version
 
 ${ANSI_CYAN}Commands:${ANSI_RESET}
   attach      Create tmux session, start AI CLI, wire pluk + rationguard
   sessions    List active pluk-monitored sessions
-  subscribe   Tail a pluk JSONL log file (from Go binary or other publisher)
+  subscribe   Tail a pluk JSONL log file (from pluk watch or any other publisher)
   watch       Classify stdin line-by-line, or poll whole tmux frames (--capture)
   send        Send text to a tmux session (inject rebuttals, commands)
   patterns    Show loaded patterns for a CLI
@@ -292,8 +292,13 @@ function cmdPatterns(args: string[]): void {
   const { flags } = parseArgs(args);
   const cli = flags['cli'] ?? 'claude';
 
-  const patterns = getPatterns(cli);
-  const available = listAvailableCLIs(bundledPatternsDir()).join(', ') || builtinCLIList();
+  const patternsDir = flags['patterns-dir'];
+  const patterns = getPatterns(cli, patternsDir);
+  const names = [
+    ...(patternsDir ? listAvailableCLIs(patternsDir) : []),
+    ...listAvailableCLIs(bundledPatternsDir()),
+  ];
+  const available = [...new Set(names)].join(', ') || builtinCLIList();
   if (!hasAnyPattern(patterns)) {
     log('info', `no pattern set for ${cli}; available CLIs: ${available}`);
   }
