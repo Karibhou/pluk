@@ -58,6 +58,11 @@ ${ANSI_CYAN}Examples:${ANSI_RESET}
 `);
 }
 
+const VALUE_FLAGS = new Set([
+  'text', 'session', 'run-dir', 'cli', 'command', 'cli-args', 'rebuttal',
+  'dir', 'rationguard-bin', 'patterns-dir', 'pane', 'filter',
+]);
+
 function parseArgs(args: string[]): { positional: string[]; flags: Record<string, string> } {
   const positional: string[] = [];
   const flags: Record<string, string> = {};
@@ -68,7 +73,12 @@ function parseArgs(args: string[]): { positional: string[]; flags: Record<string
       if (eqIdx > 0) {
         flags[arg.slice(2, eqIdx)] = arg.slice(eqIdx + 1);
       } else {
-        flags[arg.slice(2)] = 'true';
+        const name = arg.slice(2);
+        if (VALUE_FLAGS.has(name)) {
+          console.error(`${paintStderr(ANSI_RED, 'Error:')} --${name} requires a value: use --${name}=<value>`);
+          process.exit(2);
+        }
+        flags[name] = 'true';
       }
     } else {
       positional.push(arg);
@@ -163,9 +173,12 @@ function cmdWatch(args: string[]): void {
 
   const capture = flags['capture'];
   let captureIntervalMs: number | undefined;
-  if (capture && capture !== 'true') {
+  if (flags['pane'] !== undefined && !capture) {
+    console.error('Warning: --pane is ignored without --capture');
+  }
+  if (capture !== undefined && capture !== 'true') {
     captureIntervalMs = Number(capture);
-    if (!Number.isFinite(captureIntervalMs) || captureIntervalMs <= 0) {
+    if (!Number.isInteger(captureIntervalMs) || captureIntervalMs <= 0) {
       console.error(`${paintStderr(ANSI_RED, 'Error:')} --capture expects a positive integer number of milliseconds`);
       process.exit(2);
     }
@@ -232,6 +245,20 @@ function cmdAttach(args: string[]): void {
     process.exit(1);
   }
 
+  const rebuttal = flags['rebuttal'];
+  if (rebuttal !== undefined && rebuttal !== 'log' && rebuttal !== 'send') {
+    console.error(`${paintStderr(ANSI_RED, 'Error:')} --rebuttal must be one of: log, send`);
+    process.exit(2);
+  }
+
+  if (flags['rationguard'] !== 'true') {
+    for (const flag of ['rebuttal', 'rationguard-bin']) {
+      if (flags[flag] !== undefined) {
+        console.error(`Warning: --${flag} is ignored without --rationguard`);
+      }
+    }
+  }
+
   attach({
     session,
     cli: flags['cli'] ?? 'claude',
@@ -239,7 +266,7 @@ function cmdAttach(args: string[]): void {
     cliArgs: flags['cli-args'],
     runDir: flags['run-dir'],
     rationguard: flags['rationguard'] === 'true',
-    rebuttal: flags['rebuttal'] as 'log' | 'send' | undefined,
+    rebuttal,
     noRaw: flags['no-raw'] === 'true',
     workDir: flags['dir'],
     noOpen: flags['no-open'] === 'true',
