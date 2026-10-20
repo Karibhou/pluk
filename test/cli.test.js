@@ -112,6 +112,36 @@ test('--help and -h print usage and exit 0', () => {
   }
 });
 
+test('--help and -h after a subcommand print usage and exit 0 without touching tmux', () => {
+  for (const argv of [['watch'], ['attach', 'my-agent'], ['subscribe'], ['send'], ['send', 'my-agent'], ['sessions']]) {
+    for (const flag of ['--help', '-h']) {
+      // `send my-agent -h` is message text, covered by the test below.
+      if (flag === '-h' && argv[0] === 'send' && argv.length > 1) continue;
+      rmSync(tmuxLog, { force: true });
+      const { code, stdout } = runCli([...argv, flag]);
+      assert.equal(code, 0, `${argv.join(' ')} ${flag}`);
+      assert.match(stdout, /Usage:/);
+      assert.throws(() => readFileSync(tmuxLog), /ENOENT/, `tmux must not be invoked for ${argv.join(' ')} ${flag}`);
+    }
+  }
+});
+
+test('a bare -h word inside send text is forwarded, not treated as help', () => {
+  rmSync(tmuxLog, { force: true });
+  const { code, stdout } = runCli(['send', 'my-agent', 'run', 'ls', '-h']);
+  assert.equal(code, 0);
+  assert.doesNotMatch(stdout, /Usage:/);
+  assert.match(readFileSync(tmuxLog, 'utf-8'), /run ls -h/);
+});
+
+test('a bare -h after --session= is send text, matching cmdSend\'s split', () => {
+  rmSync(tmuxLog, { force: true });
+  const { code, stdout } = runCli(['send', '--session=my-agent', '-h']);
+  assert.equal(code, 0);
+  assert.doesNotMatch(stdout, /Usage:/);
+  assert.match(readFileSync(tmuxLog, 'utf-8'), /send-keys.*-h/);
+});
+
 test('an unknown command prints an error plus usage and exits 1', () => {
   const { code, stdout, stderr } = runCli(['frobnicate']);
   assert.equal(code, 1);

@@ -36,6 +36,7 @@ ${ANSI_CYAN}Commands:${ANSI_RESET}
   send        Send text to a tmux session (inject rebuttals, commands)
   patterns    Show loaded patterns for a CLI
   version     Print version
+  --help, -h  Show this usage (also works after a subcommand)
 
 ${ANSI_CYAN}Examples:${ANSI_RESET}
   ${ANSI_DIM}# One command: tmux + claude + pluk + rationguard${ANSI_RESET}
@@ -387,25 +388,45 @@ function cmdSend(args: string[]): void {
   }
 }
 
+// Dedicated bin names are pinned to one subcommand; the generic `pluk` bin
+// reads it from argv. Keep this the only place that mapping lives.
+const BIN_COMMANDS: Record<string, string> = {
+  'pluk-send': 'send',
+  'pluk-subscribe': 'subscribe',
+  'pluk-classify': 'classify',
+};
+
+function resolveCommand(bin: string, args: string[]): { command: string | undefined; rest: string[] } {
+  const pinned = BIN_COMMANDS[bin];
+  return pinned !== undefined
+    ? { command: pinned, rest: args }
+    : { command: args[0], rest: args.slice(1) };
+}
+
+// `--help` is always a flag to parseArgs, but `-h` is a positional, so inside
+// `send` it is message text once the session is known — either from the
+// leading positional or from `--session=` (mirrors cmdSend's split).
+function wantsHelp(command: string | undefined, rest: string[]): boolean {
+  if (command === '--help' || command === '-h') return true;
+  const isSend = command === 'send';
+  let sessionKnown = isSend && rest.some((arg) => arg.startsWith('--session='));
+  for (const arg of rest) {
+    if (arg === '--help') return true;
+    if (arg === '-h' && !sessionKnown) return true;
+    if (isSend && !arg.startsWith('--')) sessionKnown = true;
+  }
+  return false;
+}
+
 function main(): void {
   const bin = basename(process.argv[1] ?? '');
   const args = process.argv.slice(2);
+  const { command, rest } = resolveCommand(bin, args);
 
-  if (bin === 'pluk-subscribe') {
-    cmdSubscribe(args);
+  if (wantsHelp(command, rest)) {
+    usage();
     return;
   }
-  if (bin === 'pluk-classify') {
-    cmdWatch(args);
-    return;
-  }
-  if (bin === 'pluk-send') {
-    cmdSend(args);
-    return;
-  }
-
-  const command = args[0];
-  const rest = args.slice(1);
 
   try {
     switch (command) {
@@ -432,8 +453,6 @@ function main(): void {
       case 'version':
         console.log(`@hivecommons/pluk ${packageVersion()}`);
         break;
-      case '--help':
-      case '-h':
       case undefined:
         usage();
         break;
