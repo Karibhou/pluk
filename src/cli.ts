@@ -64,6 +64,11 @@ const VALUE_FLAGS = new Set([
   'dir', 'rationguard-bin', 'patterns-dir', 'pane', 'filter',
 ]);
 
+const BOOL_FLAGS = new Set([
+  'from-beginning', 'verbose', 'include-raw', 'rationguard', 'no-raw',
+  'no-open', 'dangerous', 'json', 'enter', 'literal',
+]);
+
 function parseArgs(args: string[]): { positional: string[]; flags: Record<string, string> } {
   const positional: string[] = [];
   const flags: Record<string, string> = {};
@@ -72,7 +77,13 @@ function parseArgs(args: string[]): { positional: string[]; flags: Record<string
     if (arg.startsWith('--')) {
       const eqIdx = arg.indexOf('=');
       if (eqIdx > 0) {
-        flags[arg.slice(2, eqIdx)] = arg.slice(eqIdx + 1);
+        const name = arg.slice(2, eqIdx);
+        const value = arg.slice(eqIdx + 1);
+        if (BOOL_FLAGS.has(name) && value !== 'true' && value !== 'false') {
+          console.error(`${paintStderr(ANSI_RED, 'Error:')} --${name} is a boolean flag: use --${name} or --${name}=false`);
+          process.exit(2);
+        }
+        flags[name] = value;
       } else {
         const name = arg.slice(2);
         if (VALUE_FLAGS.has(name)) {
