@@ -3,7 +3,7 @@
 import { basename, join } from 'node:path';
 import { Subscriber } from './subscriber.js';
 import { watch } from './watch.js';
-import { startDiagnostics, log } from './diagnostics.js';
+import { startDiagnostics, log, MAX_INTERVAL_MS } from './diagnostics.js';
 import { PLUK_EVENT_TYPES, type PlukEventType } from './event.js';
 import { listAvailableCLIs, bundledPatternsDir, getPatterns, hasAnyPattern, BUILTIN_PATTERNS } from './patterns.js';
 import { discoverSessions } from './sessions.js';
@@ -81,9 +81,8 @@ function parseFilter(raw: string | undefined): PlukEventType[] | undefined {
   return types as PlukEventType[];
 }
 
-// setInterval() stores its delay as a signed 32-bit int; larger values are
-// clamped to 1 ms with a TimeoutOverflowWarning, so reject them up front.
-const MAX_DIAGNOSTICS_SECONDS = Math.floor((2 ** 31 - 1) / 1000);
+// Keep the CLI's whole-second maximum within the shared timer limit.
+const MAX_DIAGNOSTICS_SECONDS = Math.floor(MAX_INTERVAL_MS / 1000);
 
 function parseDiagnosticsFlag(raw: string | undefined): string | undefined {
   if (raw === undefined || raw === 'true') return raw;

@@ -159,7 +159,10 @@ stdout stays pure event JSONL:
 Only fixed counter categories are reported — never the session name, raw
 terminal output or any other user-provided value — and nothing is sent off-box.
 The same counters are available programmatically via `watch(...).stats()` and
-`Subscriber#stats()`.
+`Subscriber#stats()`. Library callers of `startDiagnostics` that pass a finite
+period above 2147483.647 seconds (about 24.9 days) have it capped at that value
+to stay within Node's timer limit; the CLI rejects out-of-range values as
+described above.
 
 ## Programmatic API
 

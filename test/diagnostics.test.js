@@ -95,6 +95,34 @@ test('startDiagnostics is a no-op without the flag', () => {
   assert.deepEqual(lines, []);
 });
 
+for (const [flag, expectedMs] of [
+  ['true', 60_000],
+  ['1', 1000],
+  ['0.02', 20],
+  ['2147483', 2_147_483_000],
+  ['2147483.647', 2_147_483_647],
+  ['2147483.648', 2_147_483_647],
+  ['2147484', 2_147_483_647],
+  ['1e308', 2_147_483_647], // Finite seconds can overflow when converted to milliseconds.
+]) {
+  test(`startDiagnostics uses a safe delay for period ${flag}`, t => {
+    const interval = t.mock.method(globalThis, 'setInterval');
+    const lines = [];
+    const stop = startDiagnostics('watch', () => ({ linesSeen: 0 }), flag, l => lines.push(l));
+    try {
+      assert.equal(interval.mock.callCount(), 1);
+      const { arguments: args, result: timer } = interval.mock.calls[0];
+      assert.equal(args[1], expectedMs);
+      assert.equal(timer.hasRef(), false, 'diagnostics must not keep the process alive');
+    } finally {
+      stop();
+    }
+    stop(); // idempotent
+    assert.equal(lines.length, 1, 'stopping emits exactly one final summary');
+    assert.equal(JSON.parse(lines[0]).final, true);
+  });
+}
+
 test('startDiagnostics writes periodic and final JSON lines with fixed keys only', async () => {
   const lines = [];
   let n = 0;
