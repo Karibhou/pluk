@@ -94,6 +94,31 @@ for (const bad of ['0', '-5', 'abc', '', '1.5']) {
   });
 }
 
+// --- watch/subscribe: invalid --diagnostics value is rejected ---------------------
+
+for (const cmd of ['watch', 'subscribe']) {
+  for (const bad of ['abc', '0', '-5', '5min', 'false']) {
+    test(`${cmd} --diagnostics=${bad} exits 2 with a usage error`, () => {
+      const { code, stderr } = run(CLI, [cmd, 'x', `--diagnostics=${bad}`]);
+      assert.equal(code, 2);
+      assert.match(stderr, /--diagnostics expects a positive number of seconds/);
+    });
+  }
+
+  test(`${cmd} --diagnostics above the setInterval limit exits 2 with a usage error`, () => {
+    const { code, stderr } = run(CLI, [cmd, 'x', '--diagnostics=2147484']);
+    assert.equal(code, 2);
+    assert.match(stderr, /--diagnostics must be at most 2147483 seconds/);
+    assert.doesNotMatch(stderr, /TimeoutOverflowWarning/);
+  });
+}
+
+test('watch rejects a bad --diagnostics value before consuming stdin or logging', () => {
+  const { code, stderr } = run(CLI, ['watch', 'x', '--cli=claude', '--diagnostics=0'], { input: 'hello\n' });
+  assert.equal(code, 2);
+  assert.doesNotMatch(stderr, /pluk_diagnostics/);
+});
+
 test('watch --pane without --capture warns that --pane is ignored', () => {
   const { code, stderr } = run(CLI, ['watch', 'x', '--pane=%1'], { input: '' });
   assert.equal(code, 0);
