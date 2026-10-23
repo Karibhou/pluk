@@ -107,6 +107,8 @@ tmux attach -t my-agent
 | `pluk patterns --cli=claude` | Show loaded patterns for a CLI |
 | `pluk <command> --help` / `-h` | Show usage (works after any subcommand) |
 
+Unknown or misspelled `--flags` on any command exit 2 (`unknown flag --name`) instead of being silently ignored.
+
 ### Attach Flags
 
 | Flag | What it does |
