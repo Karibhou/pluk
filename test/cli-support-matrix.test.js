@@ -64,10 +64,13 @@ test('every CLI attach can launch has a non-empty idle pattern through getPatter
   }
 });
 
-test('every CLI with a --dangerous flag is also launchable via CLI_COMMANDS', () => {
+test('every CLI with a --dangerous flag or env is also launchable via CLI_COMMANDS', () => {
   const launchable = recordKeys(attachSource, 'CLI_COMMANDS');
   for (const cli of recordKeys(attachSource, 'DANGEROUS_FLAGS')) {
     assert.ok(launchable.includes(cli), `DANGEROUS_FLAGS has ${cli} but CLI_COMMANDS does not`);
+  }
+  for (const cli of recordKeys(attachSource, 'DANGEROUS_ENV')) {
+    assert.ok(launchable.includes(cli), `DANGEROUS_ENV has ${cli} but CLI_COMMANDS does not`);
   }
 });
 
@@ -113,8 +116,8 @@ function readmeDangerousFlags(text) {
   return pairs;
 }
 
-test('README --dangerous row lists every DANGEROUS_FLAGS entry with its exact flag', () => {
-  const flags = recordEntries(attachSource, 'DANGEROUS_FLAGS');
+test('README --dangerous row lists every DANGEROUS_FLAGS or DANGEROUS_ENV entry with its exact flag', () => {
+  const flags = { ...recordEntries(attachSource, 'DANGEROUS_FLAGS'), ...recordEntries(attachSource, 'DANGEROUS_ENV') };
   const documented = readmeDangerousFlags(readme);
   for (const [cli, flag] of Object.entries(flags)) {
     assert.equal(
@@ -131,9 +134,9 @@ test('README --dangerous row lists every DANGEROUS_FLAGS entry with its exact fl
   );
 });
 
-test('every builtin and bundled CLI has a non-empty DANGEROUS_FLAGS entry', () => {
-  const flags = recordEntries(attachSource, 'DANGEROUS_FLAGS');
+test('every builtin and bundled CLI has a non-empty DANGEROUS_FLAGS or DANGEROUS_ENV entry', () => {
+  const flags = { ...recordEntries(attachSource, 'DANGEROUS_FLAGS'), ...recordEntries(attachSource, 'DANGEROUS_ENV') };
   for (const cli of new Set([...Object.keys(BUILTIN_PATTERNS), ...bundled])) {
-    assert.ok(flags[cli], `DANGEROUS_FLAGS has no flag for ${cli}; attach --dangerous would silently no-op (#360)`);
+    assert.ok(flags[cli], `neither DANGEROUS_FLAGS nor DANGEROUS_ENV has an entry for ${cli}; attach --dangerous would silently no-op (#360)`);
   }
 });

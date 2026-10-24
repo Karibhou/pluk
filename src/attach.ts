@@ -165,12 +165,19 @@ function resolveDangerousFlag(cli: string): string {
     claude: '--dangerously-skip-permissions',
     copilot: '--allow-all-tools',
     codex: '--full-auto',
-    goose: '--non-interactive',
     omp: '--approval-mode yolo',
     gemini: '--yolo',
     aider: '--yes-always',
   };
   return DANGEROUS_FLAGS[cli] ?? '';
+}
+
+// Env-var prefixes for CLIs whose auto-approve switch is a setting, not a flag.
+function resolveDangerousEnv(cli: string): string {
+  const DANGEROUS_ENV: Record<string, string> = {
+    goose: 'GOOSE_MODE=auto',
+  };
+  return DANGEROUS_ENV[cli] ?? '';
 }
 
 function resolvePlukBin(): string {
@@ -338,11 +345,13 @@ export function attach(opts: AttachOptions): void {
     let fullCmd = buildCliCommand(cliCmd, opts.cliArgs);
     if (opts.dangerouslySkipPermissions) {
       const dangerFlag = resolveDangerousFlag(cli);
+      const dangerEnv = resolveDangerousEnv(cli);
+      if (dangerEnv) fullCmd = `${dangerEnv} ${fullCmd}`;
       if (dangerFlag) {
         // Word-split: some flags are two tokens (omp's `--approval-mode yolo`),
         // and a single shellQuote() would hand the CLI one argv entry.
         fullCmd += ` ${splitShellWords(dangerFlag).map(shellQuote).join(' ')}`;
-      } else {
+      } else if (!dangerEnv) {
         console.error(`Warning: --dangerous has no known auto-approve flag for cli=${cli}; starting without it`);
       }
     }
@@ -354,9 +363,13 @@ export function attach(opts: AttachOptions): void {
     console.error(`Attaching to existing tmux session: ${session}`);
     if (opts.dangerouslySkipPermissions) {
       const dangerFlag = resolveDangerousFlag(cli);
-      if (dangerFlag) {
-        console.error(`Warning: --dangerous was set but session already exists. The CLI may not have ${dangerFlag} enabled.`);
-        console.error(`To restart with permissions skipped: pluk send ${session} C-c && tmux send-keys -t ${shellQuote(exactTarget(session))} -- ${shellQuote(buildCliCommand(cliCmd, dangerFlag))} Enter`);
+      const dangerEnv = resolveDangerousEnv(cli);
+      if (dangerFlag || dangerEnv) {
+        const label = [dangerEnv, dangerFlag].filter(Boolean).join(' ');
+        let restartCmd = buildCliCommand(cliCmd, dangerFlag);
+        if (dangerEnv) restartCmd = `${dangerEnv} ${restartCmd}`;
+        console.error(`Warning: --dangerous was set but session already exists. The CLI may not have ${label} enabled.`);
+        console.error(`To restart with permissions skipped: pluk send ${session} C-c && tmux send-keys -t ${shellQuote(exactTarget(session))} -- ${shellQuote(restartCmd)} Enter`);
       }
     }
     if (opts.cliCommand !== undefined) {
