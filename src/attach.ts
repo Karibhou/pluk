@@ -73,10 +73,13 @@ export function splitShellWords(input: string): string[] {
 
   for (const char of input) {
     if (escaping) {
-      if (quote === '"' && !'$`"\\\n'.includes(char)) current += '\\';
+      escaping = false;
+      // POSIX line continuation: backslash-newline is removed entirely,
+      // both outside quotes and inside double quotes.
+      if (char === '\n') continue;
+      if (quote === '"' && !'$`"\\'.includes(char)) current += '\\';
       current += char;
       started = true;
-      escaping = false;
       continue;
     }
     if (char === '\\' && quote !== "'") {
