@@ -554,6 +554,15 @@ test('splitShellWords keeps backslashes before ordinary characters inside double
   assert.deepEqual(splitShellWords('"$x\\$y"'), ['$x$y']);
 });
 
+test('splitShellWords treats backslash-newline as a line continuation', () => {
+  assert.deepEqual(splitShellWords('x\\\ny'), ['xy']);
+  assert.deepEqual(splitShellWords('"x\\\ny"'), ['xy']);
+  assert.deepEqual(splitShellWords('a \\\n b'), ['a', 'b']);
+  assert.deepEqual(splitShellWords('\\\n'), []);
+  // single quotes keep both characters literally
+  assert.deepEqual(splitShellWords("'x\\\ny'"), ['x\\\ny']);
+});
+
 for (const [flag, text] of [
   ['--command=claude', /--command was set but session already exists; the running CLI was not restarted/],
   ['--cli-args=--model opus', /--cli-args was set but session already exists; the running CLI was not restarted/],
