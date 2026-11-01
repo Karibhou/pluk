@@ -122,6 +122,14 @@ export function buildCliCommand(cliCommand: string, cliArgs?: string): string {
   return words.map(shellQuote).join(' ');
 }
 
+/**
+ * Rotation knobs the pipe-pane watcher reads from its own environment. tmux
+ * runs the pipe-pane command in a shell spawned by the tmux server, which
+ * does not inherit the attaching client's environment, so these must be
+ * prefixed onto the command (like `PLUK_RUN_DIR`) for them to take effect.
+ */
+const FORWARDED_WATCH_ENV = ['PLUK_LOG_MAX_BYTES', 'PLUK_LOG_KEEP_LINES'] as const;
+
 export function buildPipePaneCommand(opts: {
   runDir: string;
   plukBin: string;
@@ -129,12 +137,20 @@ export function buildPipePaneCommand(opts: {
   cli: string;
   includeRaw: boolean;
   logFile: string;
+  /** Environment to forward {@link FORWARDED_WATCH_ENV} from; unset or empty values are omitted. */
+  env?: NodeJS.ProcessEnv;
 }): string {
   const plukWords = splitShellWords(opts.plukBin);
   if (plukWords.length === 0) throw new Error('pluk command cannot be empty');
 
+  const forwarded = FORWARDED_WATCH_ENV.flatMap(name => {
+    const value = opts.env?.[name];
+    return value ? [`${name}=${shellQuote(value)}`] : [];
+  });
+
   return [
     `PLUK_RUN_DIR=${shellQuote(opts.runDir)}`,
+    ...forwarded,
     ...plukWords.map(shellQuote),
     'watch',
     shellQuote(opts.session),
@@ -333,6 +349,7 @@ export function attach(opts: AttachOptions): void {
         cli,
         includeRaw: !opts.noRaw,
         logFile,
+        env: process.env,
       });
       log(`pipe-pane command: ${pipeCmd}`);
       console.error(`Attaching pluk pipe-pane: ${cli}`);
