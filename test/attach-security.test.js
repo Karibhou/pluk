@@ -59,6 +59,37 @@ test('pipe-pane shell command quotes PLUK_RUN_DIR, pluk command, session, cli, a
   );
 });
 
+test('pipe-pane shell command forwards and quotes the log rotation limits set in env', () => {
+  const cmd = buildPipePaneCommand({
+    runDir: '/run',
+    plukBin: 'pluk',
+    session: 's',
+    cli: 'claude',
+    includeRaw: false,
+    logFile: '/run/logs/s.jsonl',
+    env: { PLUK_LOG_MAX_BYTES: "1000; rm -rf '$(id)'", PLUK_LOG_KEEP_LINES: '10', PLUK_OTHER: 'x' },
+  });
+
+  assert.equal(
+    cmd,
+    "PLUK_RUN_DIR='/run' PLUK_LOG_MAX_BYTES='1000; rm -rf '\\''$(id)'\\''' PLUK_LOG_KEEP_LINES='10' 'pluk' watch 's' --cli='claude' >> '/run/logs/s.jsonl'",
+  );
+});
+
+test('pipe-pane shell command omits log rotation limits that are unset or empty', () => {
+  const cmd = buildPipePaneCommand({
+    runDir: '/run',
+    plukBin: 'pluk',
+    session: 's',
+    cli: 'claude',
+    includeRaw: false,
+    logFile: '/run/logs/s.jsonl',
+    env: { PLUK_LOG_MAX_BYTES: '' },
+  });
+
+  assert.equal(cmd, "PLUK_RUN_DIR='/run' 'pluk' watch 's' --cli='claude' >> '/run/logs/s.jsonl'");
+});
+
 test('shellQuote handles hostile strings without leaving unquoted metacharacters', () => {
   assert.equal(shellQuote("a b'; rm -rf .; echo '$(id)"), "'a b'\\''; rm -rf .; echo '\\''$(id)'");
 });

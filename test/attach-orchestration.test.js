@@ -281,6 +281,32 @@ test('re-attaching to an existing session replaces the pipe instead of toggling 
   assert.ok(!/ -o /.test(pipeCall), `pipe-pane must not use the -o toggle: ${pipeCall}`);
 });
 
+test('attach forwards PLUK_LOG_MAX_BYTES/PLUK_LOG_KEEP_LINES to the pipe-pane watcher only when set', () => {
+  // pipe-pane runs under the tmux server's environment, not attach's, so the
+  // rotation limits only reach the watcher if they are on the command line.
+  const set = makeStubs({ which: ['tmux', 'pluk'] });
+  const withLimits = runAttach(
+    ['agent-l', '--cli=claude', `--run-dir=${makeRunDir()}`, '--no-open'],
+    set,
+    { PLUK_LOG_MAX_BYTES: '1000', PLUK_LOG_KEEP_LINES: '10' },
+  );
+  assert.equal(withLimits.code, 0, withLimits.stderr);
+  const pipeCall = set.log('tmux').split('\n').find(l => l.startsWith('pipe-pane'));
+  assert.ok(pipeCall, 'pipe-pane should run');
+  assert.match(pipeCall, /^pipe-pane -t =agent-l: PLUK_RUN_DIR='[^']*' PLUK_LOG_MAX_BYTES='1000' PLUK_LOG_KEEP_LINES='10' '[^']*pluk' watch /);
+
+  const unset = makeStubs({ which: ['tmux', 'pluk'] });
+  const withoutLimits = runAttach(
+    ['agent-u', '--cli=claude', `--run-dir=${makeRunDir()}`, '--no-open'],
+    unset,
+    { PLUK_LOG_MAX_BYTES: undefined, PLUK_LOG_KEEP_LINES: undefined },
+  );
+  assert.equal(withoutLimits.code, 0, withoutLimits.stderr);
+  const bareCall = unset.log('tmux').split('\n').find(l => l.startsWith('pipe-pane'));
+  assert.ok(bareCall, 'pipe-pane should run');
+  assert.doesNotMatch(bareCall, /PLUK_LOG_/);
+});
+
 test('attach --dangerous with a CLI that has no auto-flag warns without --verbose and sends the bare command', () => {
   const stubs = makeStubs({ which: ['tmux', 'pluk'] });
   const { code, stderr } = runAttach(

@@ -50,7 +50,7 @@ to an idle agent, so rate limits, errors and stalls go unnoticed.
 | Subscriber sees nothing, log grows | Different `--run-dir` / `PLUK_RUN_DIR` | Align the run directory on both sides |
 | Only old events replay, or none | Subscribing from the end of the log | Add `--from-beginning` |
 | Filtered out | `--filter` lists the wrong event types | Fix the list or drop the flag |
-| Subscriber resumes after a gap | Log rotated at `PLUK_LOG_MAX_BYTES`, keeping `PLUK_LOG_KEEP_LINES` lines | Expected; raise the limits if history is needed |
+| Subscriber resumes after a gap | Log rotated at `PLUK_LOG_MAX_BYTES`, keeping `PLUK_LOG_KEEP_LINES` lines | Expected; if history is needed, raise the limits in your shell and re-run `pluk attach`, which forwards them to a fresh pipe-pane watcher (a hand-wired `pipe-pane` must prefix them onto its command) |
 | `Refusing to use ...` | Run-dir ownership or symlink check | See [run-dir-refused.md](run-dir-refused.md) |
 
 ## Recovery
